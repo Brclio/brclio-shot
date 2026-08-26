@@ -1,0 +1,214 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-macos:
+    name: Build macOS ${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            os: macos-15
+          - arch: x64
+            os: macos-15-intel
+
+    steps:
+      - name: Check out tag
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Verify tag matches package version
+        run: >-
+          node -e "const tag=process.env.GITHUB_REF_NAME;
+          const version=require('./package.json').version;
+          if(tag !== 'v' + version) {
+          console.error('Tag ' + tag + ' does not match package version ' + version);
+          process.exit(1); }"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Package macOS
+        shell: bash
+        run: |
+          if [[ -z "${CSC_LINK:-}" ]]; then
+            unset CSC_LINK CSC_KEY_PASSWORD
+            export CSC_IDENTITY_AUTO_DISCOVERY=false
+            identity_args=(-c.mac.identity=-)
+          else
+            identity_args=()
+          fi
+
+          apple_secret_count=0
+          [[ -n "${APPLE_ID:-}" ]] && ((apple_secret_count += 1))
+          [[ -n "${APPLE_APP_SPECIFIC_PASSWORD:-}" ]] && ((apple_secret_count += 1))
+          [[ -n "${APPLE_TEAM_ID:-}" ]] && ((apple_secret_count += 1))
+          if [[ "$apple_secret_count" -ne 0 && "$apple_secret_count" -ne 3 ]]; then
+            echo "Apple notarization secrets must be configured as a complete set." >&2
+            exit 1
+          fi
+          if [[ "$apple_secret_count" -eq 0 ]]; then
+            unset APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID
+          fi
+
+          npx electron-builder --mac --${{ matrix.arch }} --publish never \
+            -c.mac.minimumSystemVersion=13.0 \
+            "${identity_args[@]}"
+        env:
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Upload macOS packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-macos-${{ matrix.arch }}
+          path: |
+            release/*.dmg
+            release/*.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  build-windows:
+    name: Build Windows x64
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out tag
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Verify tag matches package version
+        run: >-
+          node -e "const tag=process.env.GITHUB_REF_NAME;
+          const version=require('./package.json').version;
+          if(tag !== 'v' + version) {
+          console.error('Tag ' + tag + ' does not match package version ' + version);
+          process.exit(1); }"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Package NSIS installer
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WIN_CSC_LINK)) {
+            Remove-Item Env:WIN_CSC_LINK -ErrorAction SilentlyContinue
+            Remove-Item Env:WIN_CSC_KEY_PASSWORD -ErrorAction SilentlyContinue
+          }
+          npx electron-builder --win nsis --x64 --publish never `
+            '-c.artifactName=Brclio-Shot-${version}-${os}-${arch}-installer.${ext}'
+        env:
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+
+      - name: Package portable executable
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WIN_CSC_LINK)) {
+            Remove-Item Env:WIN_CSC_LINK -ErrorAction SilentlyContinue
+            Remove-Item Env:WIN_CSC_KEY_PASSWORD -ErrorAction SilentlyContinue
+          }
+          npx electron-builder --win portable --x64 --publish never `
+            '-c.artifactName=Brclio-Shot-${version}-${os}-${arch}-portable.${ext}'
+        env:
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+
+      - name: Upload Windows packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-windows-x64
+          path: release/*.exe
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Publish GitHub Release
+    needs:
+      - build-macos
+      - build-windows
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Download platform packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: release
+          merge-multiple: true
+
+      - name: Generate SHA-256 checksums
+        shell: bash
+        run: >-
+          find release -maxdepth 1 -type f ! -name SHA256SUMS.txt -print0
+          | sort -z
+          | xargs -0 sha256sum
+          > release/SHA256SUMS.txt
+
+      - name: Create or update GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="$GITHUB_REF_NAME"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$tag" release/* --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            prerelease=()
+            if [[ "$tag" == *-* ]]; then
+              prerelease+=(--prerelease)
+            fi
+            gh release create "$tag" release/* \
+              --verify-tag \
+              --generate-notes \
+              --title "Brclio Shot $tag" \
+              --repo "$GITHUB_REPOSITORY" \
+              "${prerelease[@]}"
+          fi

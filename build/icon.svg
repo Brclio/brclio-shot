@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Brclio Shot">
+  <rect width="1024" height="1024" rx="228" fill="#f7f3e9"/>
+  <path d="M250 388V286c0-20 16-36 36-36h102M636 250h102c20 0 36 16 36 36v102M774 636v102c0 20-16 36-36 36H636M388 774H286c-20 0-36-16-36-36V636" fill="none" stroke="#376fc4" stroke-width="68" stroke-linecap="round"/>
+  <rect x="352" y="352" width="320" height="320" rx="92" fill="#efc968"/>
+  <path d="M432 424h94c79 0 130 42 130 106 0 70-54 112-139 112h-85V424Zm76 58v102h22c33 0 51-18 51-52 0-32-19-50-54-50h-19Z" fill="#252933"/>
+  <circle cx="746" cy="278" r="54" fill="#df5f54"/>
+</svg>

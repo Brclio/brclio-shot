@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: macOS arm64
+            os: macos-15
+            arch: arm64
+          - label: macOS x64
+            os: macos-15-intel
+            arch: x64
+          - label: Windows x64
+            os: windows-latest
+            arch: x64
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Package macOS app directory
+        if: runner.os == 'macOS'
+        run: >-
+          npx electron-builder --mac dir --${{ matrix.arch }} --publish never
+          -c.mac.identity=- -c.mac.minimumSystemVersion=13.0
+
+      - name: Package Windows app directory
+        if: runner.os == 'Windows'
+        run: npx electron-builder --win dir --x64 --publish never

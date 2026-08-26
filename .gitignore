@@ -1,0 +1,17 @@
+node_modules/
+out/
+dist/
+release/
+coverage/
+.DS_Store
+*.log
+*.tsbuildinfo
+*.dmg
+*.exe
+*.zip
+playwright-report/
+test-results/
+.playwright-cli/
+.env
+.env.*
+!.env.example

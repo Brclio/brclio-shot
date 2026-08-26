@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Private security report
+    url: https://github.com/Brclio/brclio-shot/security/advisories/new
+    about: 未公开漏洞请通过 GitHub Security Advisory 私密报告，不要创建公开 Issue。
+  - name: Documentation
+    url: https://github.com/Brclio/brclio-shot/tree/main/docs
+    about: 先查看使用、权限、长截图与发布文档。

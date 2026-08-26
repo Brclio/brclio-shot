@@ -1,0 +1,61 @@
+name: Feature request
+description: 提议一个符合本地优先与跨平台边界的新能力
+title: "[Feature] "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请先描述需要解决的问题，再描述方案。v0.1 的窗口截图为来源列表选择，跨应用长截图为手动滚动；如果提议改变这些边界，请说明平台差异和权限影响。
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: 要解决的问题
+      placeholder: 当我……时，希望……，因为……
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 建议方案
+      description: 描述用户流程、快捷键、失败状态和默认行为。
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 目标平台
+      multiple: true
+      options:
+        - macOS 13+
+        - Windows 10/11 64-bit
+        - 两端一致
+    validations:
+      required: true
+
+  - type: textarea
+    id: privacy
+    attributes:
+      label: 权限、隐私与安全影响
+      description: 是否需要新系统权限、网络请求、后台进程或读取其他应用数据？如无也请写明。
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 考虑过的替代方案
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 提交前确认
+      options:
+        - label: 我已搜索现有 Issue。
+          required: true
+        - label: 我理解功能需要在真实 macOS 与 Windows 环境验证。
+          required: true
