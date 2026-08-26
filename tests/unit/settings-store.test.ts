@@ -21,7 +21,8 @@ describe('settings store', () => {
     const mac = createDefaultSettings('/Pictures', 'darwin')
     const windows = createDefaultSettings('C:\\Pictures', 'win32')
 
-    expect(mac.saveDirectory).toBe('/Pictures/Brclio Shot')
+    expect(mac.saveDirectory).toBe(join('/Pictures', 'Brclio Shot'))
+    expect(windows.saveDirectory).toBe(join('C:\\Pictures', 'Brclio Shot'))
     expect(mac.shortcuts.captureRegion).toBe('Alt+Shift+A')
     expect(windows.shortcuts.captureRegion).toBe('CommandOrControl+Shift+A')
     expect(new Set(Object.values(defaultShortcuts('darwin'))).size).toBe(9)
